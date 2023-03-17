@@ -28,22 +28,24 @@ class MusicTransformer(nn.Module):
     ----------
     """
 
-    def __init__(self, n_layers=6, num_heads=8, d_model=512, dim_feedforward=1024,
+    def __init__(self, new_notation, n_layers=6, num_heads=8, d_model=512, dim_feedforward=1024,
                  dropout=0.1, max_sequence=2048, rpr=False):
         super(MusicTransformer, self).__init__()
 
-        self.dummy      = DummyDecoder()
-
-        self.nlayers    = n_layers
-        self.nhead      = num_heads
-        self.d_model    = d_model
-        self.d_ff       = dim_feedforward
-        self.dropout    = dropout
-        self.max_seq    = max_sequence
-        self.rpr        = rpr
+        self.dummy        = DummyDecoder()
+        self.nlayers      = n_layers
+        self.nhead        = num_heads
+        self.d_model      = d_model
+        self.d_ff         = dim_feedforward
+        self.dropout      = dropout
+        self.max_seq      = max_sequence
+        self.rpr          = rpr
+        self.new_notation = new_notation
+        
+        embedding_dim = VOCAB_SIZE_NEW_NOTATION if self.new_notation else VOCAB_SIZE
 
         # Input embedding
-        self.embedding = nn.Embedding(VOCAB_SIZE, self.d_model)
+        self.embedding = nn.Embedding(embedding_dim, self.d_model)
 
         # Positional encoding
         self.positional_encoding = PositionalEncoding(self.d_model, self.dropout, self.max_seq)
@@ -69,7 +71,7 @@ class MusicTransformer(nn.Module):
             )
 
         # Final output is a softmaxed linear layer
-        self.Wout       = nn.Linear(self.d_model, VOCAB_SIZE)
+        self.Wout       = nn.Linear(self.d_model, embedding_dim)
         self.softmax    = nn.Softmax(dim=-1)
 
     # forward
@@ -83,14 +85,12 @@ class MusicTransformer(nn.Module):
         A prediction at one index is the "next" prediction given all information seen previously.
         ----------
         """
-
         if(mask is True):
             mask = self.transformer.generate_square_subsequent_mask(x.shape[1]).to(get_device())
         else:
             mask = None
 
         x = self.embedding(x)
-
         # Input shape is (max_seq, batch_size, d_model)
         x = x.permute(1,0,2)
 
@@ -102,12 +102,10 @@ class MusicTransformer(nn.Module):
 
         # Back to (batch_size, max_seq, d_model)
         x_out = x_out.permute(1,0,2)
-
         y = self.Wout(x_out)
         # y = self.softmax(y)
 
         del mask
-
         # They are trained to predict the next note in sequence (we don't need the last one)
         return y
 
@@ -121,6 +119,10 @@ class MusicTransformer(nn.Module):
         the softmax probabilities (recommended) or by using a beam search.
         ----------
         """
+        if self.new_notation:
+            TOKEN_END = TOKEN_END_NEW_NOTATION
+            TOKEN_PAD = TOKEN_PAD_NEW_NOTATION
+            VOCAB_SIZE = VOCAB_SIZE_NEW_NOTATION
 
         assert (not self.training), "Cannot generate while in training mode"
 
@@ -149,8 +151,8 @@ class MusicTransformer(nn.Module):
                 token_probs = token_probs.flatten()
                 top_res, top_i = torch.topk(token_probs, beam)
 
-                beam_rows = top_i // VOCAB_SIZE
-                beam_cols = top_i % VOCAB_SIZE
+                beam_rows = top_i // (VOCAB_SIZE)
+                beam_cols = top_i % (VOCAB_SIZE)
 
                 gen_seq = gen_seq[beam_rows, :]
                 gen_seq[..., cur_i] = beam_cols

@@ -6,6 +6,7 @@ import random
 
 import third_party.midi_processor.processor as midi_processor
 
+random.seed(1)
 JSON_FILE = "maestro-v2.0.0.json"
 
 # prep_midi
@@ -58,11 +59,13 @@ def prep_maestro_midi(maestro_root, output_dir):
             print("ERROR: Unrecognized split type:", split_type)
             return False
 
-        prepped = midi_processor.encode_midi(mid)
+        prepped = midi_processor.encode_midi_original(mid)
+        with open(o_file, "wb") as o_stream:
+            pickle.dump(prepped, o_stream)
 
-        o_stream = open(o_file, "wb")
-        pickle.dump(prepped, o_stream)
-        o_stream.close()
+        prepped_new_notation = midi_processor.encode_midi_modified(mid)
+        with open(o_file + "-duration", "wb") as o_stream:
+            pickle.dump(prepped_new_notation, o_stream)
 
         total_count += 1
         if(total_count % 50 == 0):
@@ -79,7 +82,7 @@ def prep_custom_midi(custom_midi_root, output_dir, valid_p = 0.1, test_p = 0.2):
     Author: Corentin Nelias
     ----------
     Pre-processes custom midi files that are not part of the maestro dataset, putting processed midi data (train, eval, test) into the
-    given output folder. 
+    given output folder.
     ----------
     """
     train_dir = os.path.join(output_dir, "train")
@@ -88,14 +91,14 @@ def prep_custom_midi(custom_midi_root, output_dir, valid_p = 0.1, test_p = 0.2):
     os.makedirs(val_dir, exist_ok=True)
     test_dir = os.path.join(output_dir, "test")
     os.makedirs(test_dir, exist_ok=True)
-    
+
     print("Found", len(os.listdir(custom_midi_root)), "pieces")
     print("Preprocessing custom data...")
     total_count = 0
     train_count = 0
     val_count   = 0
     test_count  = 0
-    
+
     for piece in os.listdir(custom_midi_root):
         #deciding whether the data should be part of train, valid or test dataset
         is_train = True if random.random() > valid_p else False
@@ -107,7 +110,7 @@ def prep_custom_midi(custom_midi_root, output_dir, valid_p = 0.1, test_p = 0.2):
             split_type = "validation"
         else:
             split_type = "test"
-            
+
         mid         = os.path.join(custom_midi_root, piece)
         f_name      = piece.split(".")[0] + ".pickle"
 
@@ -120,12 +123,14 @@ def prep_custom_midi(custom_midi_root, output_dir, valid_p = 0.1, test_p = 0.2):
         elif(split_type == "test"):
             o_file = os.path.join(test_dir, f_name)
             test_count += 1
-        
-        prepped = midi_processor.encode_midi(mid)
 
-        o_stream = open(o_file, "wb")
-        pickle.dump(prepped, o_stream)
-        o_stream.close()
+        prepped = midi_processor.encode_midi_original(mid)
+        with open(o_file, "wb") as o_stream:
+            pickle.dump(prepped, o_stream)
+
+        prepped_new_notation = midi_processor.encode_midi_modified(mid)
+        with open(o_file + "-duration", "wb") as o_stream:
+            pickle.dump(prepped_new_notation, o_stream)
 
         total_count += 1
         if(total_count % 50 == 0):

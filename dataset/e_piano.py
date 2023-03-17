@@ -24,13 +24,18 @@ class EPianoDataset(Dataset):
     ----------
     """
 
-    def __init__(self, root, max_seq=2048, random_seq=True):
-        self.root       = root
-        self.max_seq    = max_seq
-        self.random_seq = random_seq
+    def __init__(self, root, new_notation, max_seq=2048, random_seq=True):
+        self.root         = root
+        self.max_seq      = max_seq
+        self.random_seq   = random_seq
+        self.new_notation = new_notation
 
         fs = [os.path.join(root, f) for f in os.listdir(self.root)]
         self.data_files = [f for f in fs if os.path.isfile(f)]
+        if new_notation:
+            self.data_files = [path for path in self.data_files if path.endswith("-duration")]
+        else:
+            self.data_files = [path for path in self.data_files if not path.endswith("-duration")]
 
     # __len__
     def __len__(self):
@@ -62,12 +67,12 @@ class EPianoDataset(Dataset):
         raw_mid     = torch.tensor(pickle.load(i_stream), dtype=TORCH_LABEL_TYPE, device=cpu_device())
         i_stream.close()
 
-        x, tgt = process_midi(raw_mid, self.max_seq, self.random_seq)
+        x, tgt = process_midi(raw_mid, self.max_seq, self.random_seq, self.new_notation)
 
         return x, tgt
 
 # process_midi
-def process_midi(raw_mid, max_seq, random_seq):
+def process_midi(raw_mid, max_seq, random_seq, new_notation):
     """
     ----------
     Author: Damon Gwinn
@@ -77,8 +82,8 @@ def process_midi(raw_mid, max_seq, random_seq):
     ----------
     """
 
-    x   = torch.full((max_seq, ), TOKEN_PAD, dtype=TORCH_LABEL_TYPE, device=cpu_device())
-    tgt = torch.full((max_seq, ), TOKEN_PAD, dtype=TORCH_LABEL_TYPE, device=cpu_device())
+    x   = torch.full((max_seq, ), TOKEN_PAD_NEW_NOTATION if new_notation else TOKEN_PAD, dtype=TORCH_LABEL_TYPE, device=cpu_device())
+    tgt = torch.full((max_seq, ), TOKEN_PAD_NEW_NOTATION if new_notation else TOKEN_PAD, dtype=TORCH_LABEL_TYPE, device=cpu_device())
 
     raw_len     = len(raw_mid)
     full_seq    = max_seq + 1 # Performing seq2seq
@@ -89,7 +94,7 @@ def process_midi(raw_mid, max_seq, random_seq):
     if(raw_len < full_seq):
         x[:raw_len]         = raw_mid
         tgt[:raw_len-1]     = raw_mid[1:]
-        tgt[raw_len-1]      = TOKEN_END
+        tgt[raw_len-1]      = TOKEN_END_NEW_NOTATION if new_notation else TOKEN_END
     else:
         # Randomly selecting a range
         if(random_seq):
@@ -115,7 +120,7 @@ def process_midi(raw_mid, max_seq, random_seq):
 
 
 # create_epiano_datasets
-def create_epiano_datasets(dataset_root, max_seq, random_seq=True):
+def create_epiano_datasets(dataset_root, max_seq, new_notation, random_seq=True):
     """
     ----------
     Author: Damon Gwinn
@@ -129,14 +134,14 @@ def create_epiano_datasets(dataset_root, max_seq, random_seq=True):
     val_root = os.path.join(dataset_root, "val")
     test_root = os.path.join(dataset_root, "test")
 
-    train_dataset = EPianoDataset(train_root, max_seq, random_seq)
-    val_dataset = EPianoDataset(val_root, max_seq, random_seq)
-    test_dataset = EPianoDataset(test_root, max_seq, random_seq)
+    train_dataset = EPianoDataset(train_root, new_notation, max_seq, random_seq)
+    val_dataset = EPianoDataset(val_root, new_notation, max_seq, random_seq)
+    test_dataset = EPianoDataset(test_root, new_notation, max_seq, random_seq)
 
     return train_dataset, val_dataset, test_dataset
 
 # compute_epiano_accuracy
-def compute_epiano_accuracy(out, tgt):
+def compute_epiano_accuracy(out, tgt, new_notation):
     """
     ----------
     Author: Damon Gwinn
@@ -145,19 +150,19 @@ def compute_epiano_accuracy(out, tgt):
     of the output.
     ----------
     """
-
     softmax = nn.Softmax(dim=-1)
     out = torch.argmax(softmax(out), dim=-1)
 
     out = out.flatten()
     tgt = tgt.flatten()
 
-    mask = (tgt != TOKEN_PAD)
+    mask = (tgt != TOKEN_PAD_NEW_NOTATION) if new_notation else (tgt != TOKEN_PAD)
 
     out = out[mask]
     tgt = tgt[mask]
 
     # Empty
+
     if(len(tgt) == 0):
         return 1.0
 

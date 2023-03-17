@@ -35,7 +35,7 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Grabbing dataset if needed
-    _, _, dataset = create_epiano_datasets(args.midi_root, args.num_prime, random_seq=False)
+    _, _, dataset = create_epiano_datasets(args.midi_root, args.num_prime, args.new_notation, random_seq=False)
 
     # Can be None, an integer index to dataset, or a file path
     if(args.primer_file is None):
@@ -56,12 +56,12 @@ def main():
             print("Error: No midi messages in primer file:", f)
             return
 
-        primer, _  = process_midi(raw_mid, args.num_prime, random_seq=False)
+        primer, _  = process_midi(raw_mid, args.num_prime, random_seq=False, new_notation=args.new_notation)
         primer = torch.tensor(primer, dtype=TORCH_LABEL_TYPE, device=get_device())
 
         print("Using primer file:", f)
 
-    model = MusicTransformer(n_layers=args.n_layers, num_heads=args.num_heads,
+    model = MusicTransformer(new_notation=args.new_notation, n_layers=args.n_layers, num_heads=args.num_heads,
                 d_model=args.d_model, dim_feedforward=args.dim_feedforward,
                 max_sequence=args.max_sequence, rpr=args.rpr).to(get_device())
 

@@ -57,7 +57,7 @@ def train_epoch(cur_epoch, model, dataloader, loss, opt, lr_scheduler=None, prin
     return
 
 # eval_model
-def eval_model(model, dataloader, loss):
+def eval_model(model, dataloader, loss, new_notation):
     """
     ----------
     Author: Damon Gwinn
@@ -80,7 +80,7 @@ def eval_model(model, dataloader, loss):
 
             y = model(x)
 
-            sum_acc += float(compute_epiano_accuracy(y, tgt))
+            sum_acc += float(compute_epiano_accuracy(y, tgt, new_notation))
 
             y   = y.reshape(y.shape[0] * y.shape[1], -1)
             tgt = tgt.flatten()

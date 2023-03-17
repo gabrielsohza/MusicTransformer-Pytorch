@@ -10,7 +10,6 @@ from torch.optim import Adam
 from dataset.e_piano import create_epiano_datasets, compute_epiano_accuracy
 
 from model.music_transformer import MusicTransformer
-from model.loss import SmoothCrossEntropyLoss
 
 from utilities.constants import *
 from utilities.device import get_device, use_cuda
@@ -68,13 +67,13 @@ def main():
         tensorboard_summary = SummaryWriter(log_dir=tensorboad_dir)
 
     ##### Datasets #####
-    train_dataset, val_dataset, test_dataset = create_epiano_datasets(args.input_dir, args.max_sequence)
+    train_dataset, val_dataset, test_dataset = create_epiano_datasets(args.input_dir, args.max_sequence, args.new_notation)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.n_workers, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.n_workers)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=args.n_workers)
 
-    model = MusicTransformer(n_layers=args.n_layers, num_heads=args.num_heads,
+    model = MusicTransformer(new_notation=args.new_notation, n_layers=args.n_layers, num_heads=args.num_heads,
                 d_model=args.d_model, dim_feedforward=args.dim_feedforward, dropout=args.dropout,
                 max_sequence=args.max_sequence, rpr=args.rpr).to(get_device())
 
@@ -104,13 +103,9 @@ def main():
         lr = args.lr
 
     ##### Not smoothing evaluation loss #####
-    eval_loss_func = nn.CrossEntropyLoss(ignore_index=TOKEN_PAD)
+    eval_loss_func = nn.CrossEntropyLoss(ignore_index=TOKEN_PAD_NEW_NOTATION if args.new_notation else TOKEN_PAD)
+    train_loss_func = eval_loss_func
 
-    ##### SmoothCrossEntropyLoss or CrossEntropyLoss for training #####
-    if(args.ce_smoothing is None):
-        train_loss_func = eval_loss_func
-    else:
-        train_loss_func = SmoothCrossEntropyLoss(args.ce_smoothing, VOCAB_SIZE, ignore_index=TOKEN_PAD)
 
     ##### Optimizer #####
     opt = Adam(model.parameters(), lr=lr, betas=(ADAM_BETA_1, ADAM_BETA_2), eps=ADAM_EPSILON)
@@ -152,8 +147,8 @@ def main():
             print("Baseline model evaluation (Epoch 0):")
 
         # Eval
-        train_loss, train_acc = eval_model(model, train_loader, train_loss_func)
-        eval_loss, eval_acc = eval_model(model, test_loader, eval_loss_func)
+        train_loss, train_acc = eval_model(model, train_loader, train_loss_func, args.new_notation)
+        eval_loss, eval_acc = eval_model(model, test_loader, eval_loss_func, args.new_notation)
 
         # Learn rate
         lr = get_lr(opt)
