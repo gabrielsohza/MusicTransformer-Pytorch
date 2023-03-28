@@ -155,8 +155,11 @@ def compute_epiano_accuracy(out, tgt, new_notation):
 
     out = out.flatten()
     tgt = tgt.flatten()
-
-    mask = (tgt != TOKEN_PAD_NEW_NOTATION) if new_notation else (tgt != TOKEN_PAD)
+    
+    if new_notation:
+        mask = (tgt != TOKEN_PAD_NEW_NOTATION)
+    else:
+        mask = (tgt != TOKEN_PAD)
 
     out = out[mask]
     tgt = tgt[mask]

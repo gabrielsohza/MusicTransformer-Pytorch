@@ -119,16 +119,11 @@ class MusicTransformer(nn.Module):
         the softmax probabilities (recommended) or by using a beam search.
         ----------
         """
-        if self.new_notation:
-            TOKEN_END = TOKEN_END_NEW_NOTATION
-            TOKEN_PAD = TOKEN_PAD_NEW_NOTATION
-            VOCAB_SIZE = VOCAB_SIZE_NEW_NOTATION
-
         assert (not self.training), "Cannot generate while in training mode"
 
         print("Generating sequence of max length:", target_seq_length)
 
-        gen_seq = torch.full((1,target_seq_length), TOKEN_PAD, dtype=TORCH_LABEL_TYPE, device=get_device())
+        gen_seq = torch.full((1,target_seq_length), TOKEN_PAD_NEW_NOTATION if self.new_notation else TOKEN_PAD, dtype=TORCH_LABEL_TYPE, device=get_device())
 
         num_primer = len(primer)
         gen_seq[..., :num_primer] = primer.type(TORCH_LABEL_TYPE).to(get_device())
@@ -139,7 +134,10 @@ class MusicTransformer(nn.Module):
         cur_i = num_primer
         while(cur_i < target_seq_length):
             # gen_seq_batch     = gen_seq.clone()
-            y = self.softmax(self.forward(gen_seq[..., :cur_i]))[..., :TOKEN_END]
+            if self.new_notation:
+                y = self.softmax(self.forward(gen_seq[..., :cur_i]))[..., :TOKEN_END_NEW_NOTATION]
+            else:
+                y = self.softmax(self.forward(gen_seq[..., :cur_i]))[..., :TOKEN_END]
             token_probs = y[:, cur_i-1, :]
 
             if(beam == 0):
@@ -151,8 +149,12 @@ class MusicTransformer(nn.Module):
                 token_probs = token_probs.flatten()
                 top_res, top_i = torch.topk(token_probs, beam)
 
-                beam_rows = top_i // (VOCAB_SIZE)
-                beam_cols = top_i % (VOCAB_SIZE)
+                if self.new_notation:
+                    beam_rows = top_i // (VOCAB_SIZE_NEW_NOTATION)
+                    beam_cols = top_i % (VOCAB_SIZE_NEW_NOTATION)
+                else:
+                    beam_rows = top_i // (VOCAB_SIZE)
+                    beam_cols = top_i % (VOCAB_SIZE)
 
                 gen_seq = gen_seq[beam_rows, :]
                 gen_seq[..., cur_i] = beam_cols
@@ -165,7 +167,7 @@ class MusicTransformer(nn.Module):
 
 
                 # Let the transformer decide to end if it wants to
-                if(next_token == TOKEN_END):
+                if(next_token == TOKEN_END and not self.new_notation) or (next_token == TOKEN_END_NEW_NOTATION and self.new_notation):
                     print("Model called end of sequence at:", cur_i, "/", target_seq_length)
                     break
 
