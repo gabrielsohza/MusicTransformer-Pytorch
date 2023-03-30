@@ -65,7 +65,12 @@ def main():
         primer = primer.int().to(get_device())
 
         print("Using primer index:", idx, "(", dataset.data_files[idx], ")")
-        copyfile(dataset.data_files[idx], f"{args.output_dir}/original-{idx}.mid")
+        with open(dataset.data_files[idx], "rb") as p:
+            original = pickle.load(p)
+        if args.new_notation:
+            decode_midi_modified(original, f"{args.output_dir}/original-{idx}.mid")
+        else:
+            decode_midi_original(original, f"{args.output_dir}/original-{idx}.mid")
 
         model = MusicTransformer(new_notation=args.new_notation, n_layers=args.n_layers, num_heads=args.num_heads,
                     d_model=args.d_model, dim_feedforward=args.dim_feedforward,
