@@ -5,6 +5,7 @@ import random
 import pretty_midi
 import pickle
 import sys
+from shutil import copyfile
 
 from third_party.midi_processor.processor import encode_midi_original, encode_midi_modified, decode_midi_modified, decode_midi_original
 
@@ -64,13 +65,7 @@ def main():
         primer = primer.int().to(get_device())
 
         print("Using primer index:", idx, "(", dataset.data_files[idx], ")")
-        if args.new_notation:
-            decode_midi_modified(primer.tolist(), f"{args.output_dir}/original-{idx}.mid")
-        else:
-            decode_midi_original(primer.tolist(), f"{args.output_dir}/original-{idx}.mid")
-
-        dir_split = dataset.data_files[idx].rfind("/") + 1
-        filepath, filename = dataset.data_files[idx][:dir_split], dataset.data_files[idx][dir_split:-7]
+        copyfile(dataset.data_files[idx], f"{args.output_dir}/original-{idx}.mid")
 
         model = MusicTransformer(new_notation=args.new_notation, n_layers=args.n_layers, num_heads=args.num_heads,
                     d_model=args.d_model, dim_feedforward=args.dim_feedforward,
